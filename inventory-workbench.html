@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>库存工作台</title>
+<style>
+:root{
+  --bg:#f4f6fa;--panel:#fff;--line:#e3e8f0;--text:#1b2537;--sub:#6b7a90;
+  --brand:#2f6bff;--brand-soft:#eaf0ff;--ok:#12a86a;--ok-soft:#e6f7f0;
+  --warn:#e8912a;--warn-soft:#fdf3e4;--danger:#e2434b;--danger-soft:#fdeaeb;
+  --radius:12px;--shadow:0 1px 2px rgba(20,35,70,.06),0 8px 24px rgba(20,35,70,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;font-family:"SF Mono",Consolas,"Liberation Mono",Menlo,monospace}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+
+/* 顶栏 */
+.topbar{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:14px 22px;background:var(--panel);
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+.brand{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600}
+.brand .logo{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#2f6bff,#5b92ff);color:#fff;font-size:15px;font-weight:700}
+.brand small{display:block;font-size:11px;font-weight:400;color:var(--sub);letter-spacing:1px}
+.clock{display:flex;align-items:baseline;gap:14px;padding:7px 16px;border-radius:var(--radius);
+  background:linear-gradient(135deg,#f7f9ff,#eef3ff);border:1px solid #dbe5ff}
+.clock .d{font-size:20px;font-weight:700}
+.clock .t{font-size:22px;font-weight:700;color:var(--brand);letter-spacing:1px}
+.clock .w{font-size:12px;color:var(--sub)}
+.spacer{flex:1}
+.field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
+.field input,.field select{padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.btn{padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--text);transition:.15s}
+.btn:hover{border-color:#c6d2e6;background:#fafcff}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:#245ae6}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:#f5cdcf}
+
+.wrap{padding:20px 22px 40px;max-width:1860px;margin:0 auto}
+
+/* 汇总卡 */
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:14px}
+@media(max-width:1400px){.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card .k{font-size:12px;color:var(--sub)}
+.card .v{font-size:25px;font-weight:700;margin-top:8px;line-height:1.15}
+.card .v .u{font-size:13px;font-weight:500;color:var(--sub);margin-left:5px}
+.card .s{font-size:12px;color:var(--sub);margin-top:6px}
+.card::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--brand)}
+.card.ok::after{background:var(--ok)}.card.warn::after{background:var(--warn)}
+.card.danger::after{background:var(--danger)}.card.alt::after{background:#8a5cf6}
+.card.sale::after{background:#0ea5a5}
+
+/* 工具条 */
+.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 12px}
+.toolbar .grow{flex:1;min-width:180px}
+.search{position:relative}
+.search input{width:100%;padding:8px 12px 8px 32px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.search::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--sub);font-size:16px}
+.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+.seg button{padding:7px 12px;border:0;background:transparent;color:var(--sub);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.sel{padding:8px 10px;border-radius:9px}
+
+/* 表格 */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.panel .head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.panel .head h3{margin:0;font-size:14px;font-weight:600}
+.panel .head .sub{font-size:12px;color:var(--sub)}
+.tbl-scroll{overflow:auto;max-height:560px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{position:sticky;top:0;z-index:2;background:#f8fafd;text-align:left;font-weight:600;color:#465469;
+  padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px}
+tbody td{padding:8px 12px;border-bottom:1px solid #f0f3f8;white-space:nowrap;vertical-align:middle}
+tbody tr:hover{background:#fafcff}
+tbody tr:last-child td{border-bottom:0}
+.r{text-align:right}.c{text-align:center}
+.code{font-family:"SF Mono",Consolas,monospace;font-size:12px;color:#41506b;background:#f2f5fa;padding:2px 7px;border-radius:5px}
+.qty{font-size:14px;font-weight:700}
+.qty .u{font-size:11px;font-weight:500;color:var(--sub);margin-left:3px}
+.qty.dim{color:#93a1b6}
+.muted{color:var(--sub);font-size:12px}
+.cost{color:#5b6b84}
+.sale{color:#0b8f8f;font-weight:600}
+.nosale{color:#b3bfd0;font-size:12px}
+.catlink{color:var(--brand);cursor:pointer;border-bottom:1px dashed #bcd0ff}
+.catlink:hover{background:var(--brand-soft)}
+.plink{color:var(--brand);text-decoration:none;font-size:12px;display:inline-block;max-width:160px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.plink:hover{text-decoration:underline}
+.thumb{width:44px;height:44px;border-radius:8px;border:1px solid var(--line);object-fit:cover;background:#f6f8fc;display:block;cursor:zoom-in}
+.thumb.ph{display:grid;place-items:center;color:#b6c2d4;font-size:10px;cursor:default;
+  background:repeating-linear-gradient(45deg,#f7f9fc,#f7f9fc 6px,#eef2f8 6px,#eef2f8 12px)}
+.time{font-family:"SF Mono",Consolas,monospace;font-size:12px}
+.time.full{color:#28344a}.time.none{color:#aab6c6}
+.time.in{color:var(--ok)}.time.out{color:#c2536a}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+.tag .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.danger{background:var(--danger-soft);color:var(--danger)}
+.tag.buy{background:var(--brand-soft);color:var(--brand)}
+.ops{display:flex;gap:6px}
+.mini{padding:4px 10px;border-radius:7px;border:1px solid var(--line);background:#fff;font-size:12px}
+.mini:hover{border-color:#c6d2e6;background:#fafcff}
+.mini.in{color:var(--ok);border-color:#c4e9d8;background:#f4fdf9}
+.mini.out{color:var(--danger);border-color:#f5cdcf;background:#fef7f7}
+.mini.edit{color:var(--brand);border-color:#cfdeff;background:#f5f8ff}
+.mini.del{color:var(--sub);padding:4px 8px}
+
+/* 流水 */
+.flow{max-height:400px}
+.flow td{font-size:12.5px}
+.delta.up{color:var(--ok);font-weight:700}
+.delta.down{color:var(--danger);font-weight:700}
+.pill{padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:600}
+.pill.in{background:var(--ok-soft);color:var(--ok)}
+.pill.out{background:var(--danger-soft);color:var(--danger)}
+.pill.adj{background:#f1ecfe;color:#7c4df0}
+.empty{padding:34px;text-align:center;color:var(--sub);font-size:13px}
+
+/* 弹窗 */
+dialog{border:0;border-radius:14px;padding:0;width:760px;max-width:94vw;box-shadow:0 24px 60px rgba(15,30,60,.24)}
+dialog.narrow{width:470px}
+dialog.wide{width:560px}
+dialog::backdrop{background:rgba(18,26,44,.42)}
+/* 打开时纵向排列：内容区滚动、底部按钮常驻可见 */
+dialog[open]{display:flex;flex-direction:column;max-height:92vh}
+.dlg-body{padding:20px 22px;flex:1 1 auto;overflow:auto;min-height:0}
+.dlg-body h3{margin:0 0 4px;font-size:16px}
+.dlg-body .hint{font-size:12px;color:var(--sub);margin-bottom:14px}
+.form-row{margin-bottom:13px}
+.form-row label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:#fff;resize:vertical}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+.form-row input[readonly]{background:#f4f6fa;color:var(--sub)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.err{color:var(--danger);font-size:12px;min-height:16px}
+.dlg-foot{flex:0 0 auto;display:flex;gap:10px;padding:14px 22px;background:#f8fafd;border-top:1px solid var(--line);align-items:center}
+.sec{font-size:12px;font-weight:600;color:#465469;margin:16px 0 10px;padding-left:9px;border-left:3px solid var(--brand)}
+.sec:first-of-type{margin-top:4px}
+.free{font-size:11px;color:var(--ok);background:var(--ok-soft);border-radius:6px;padding:2px 7px;margin-left:6px;font-weight:600}
+.editable{font-size:11px;color:var(--brand);background:var(--brand-soft);border-radius:6px;padding:2px 7px;margin-left:6px;font-weight:600}
+.calcbox{background:#f8fafd;border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:12px;color:var(--sub);
+  display:flex;gap:18px;flex-wrap:wrap;margin-bottom:13px}
+.calcbox b{font-weight:700;color:var(--text)}
+.calcbox .gp{color:var(--ok);font-weight:700}
+.calcbox .gp.neg{color:var(--danger)}
+
+/* 图片上传 */
+.imgpick{display:flex;gap:14px;align-items:flex-start}
+.imgbox{width:132px;height:132px;flex:0 0 132px;border-radius:12px;border:1.5px dashed #c9d5e8;background:#f8fafd;
+  display:grid;place-items:center;position:relative;overflow:hidden;cursor:pointer;transition:.15s;text-align:center}
+.imgbox:hover,.imgbox.over{border-color:var(--brand);background:var(--brand-soft)}
+.imgbox img{width:100%;height:100%;object-fit:cover;display:block}
+.imgbox .ph-txt{font-size:11.5px;color:var(--sub);line-height:1.7;padding:0 10px}
+.imgbox .ph-txt b{display:block;font-size:22px;color:#b6c2d4;font-weight:400}
+.imgbox .overlay{position:absolute;inset:auto 0 0 0;background:rgba(18,26,44,.62);color:#fff;font-size:11px;padding:4px 0;text-align:center}
+.imgside{flex:1;min-width:0}
+.imgside .tip{font-size:12px;color:var(--sub);line-height:1.9}
+.imgside .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.badge{font-size:11px;color:var(--sub);background:#f2f5fa;border-radius:6px;padding:3px 8px;display:inline-block}
+
+/* 待采购：选中商品后的图片 + 采购链接预览（均可点击） */
+.buy-prev{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;margin-bottom:13px;
+  background:#f8fafd;border:1px solid var(--line);border-radius:10px}
+.buy-prev img.bp-img{width:72px;height:72px;flex:0 0 72px;border-radius:10px;border:1px solid var(--line);
+  object-fit:cover;background:#f6f8fc;display:block;cursor:zoom-in}
+.buy-prev .bp-ph{width:72px;height:72px;flex:0 0 72px;border-radius:10px;border:1px dashed #c9d5e8;
+  display:grid;place-items:center;color:#b6c2d4;font-size:11px;text-align:center;
+  background:repeating-linear-gradient(45deg,#f7f9fc,#f7f9fc 6px,#eef2f8 6px,#eef2f8 12px)}
+.buy-prev .bp-main{flex:1;min-width:0}
+.buy-prev .bp-name{font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.buy-prev .bp-meta{font-size:12px;color:var(--sub);line-height:1.7}
+.buy-prev .bp-link{margin-top:4px}
+
+/* 出入库流水：商品缩略图（点击看大图） */
+.thumb.sm{width:34px;height:34px;font-size:9px}
+.tag.plan{background:#eef2ff;color:#4653c8}
+
+/* 顶栏：数据同步（保存提示 / 备份 / 分享链接） */
+.sync{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#saveState{transition:.25s}
+#saveState.flash{background:var(--ok-soft);color:var(--ok)}
+
+/* 品类管理 */
+.cat-add{display:flex;gap:8px;margin-bottom:12px}
+.cat-add input{flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:9px}
+.cat-list{border:1px solid var(--line);border-radius:10px;max-height:300px;overflow-y:auto}
+.cat-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f0f3f8}
+.cat-row:last-child{border-bottom:0}
+.cat-row:hover{background:#fafcff}
+.cat-row .nm{font-weight:600}
+.cat-row .nm.zero{color:var(--sub);font-weight:400}
+.cat-row .empty-cat{font-size:11px;color:#aab6c6}
+
+.timebar{display:flex;align-items:center;gap:10px;padding:9px 13px;margin-bottom:14px;border-radius:10px;
+  background:linear-gradient(135deg,#f7f9ff,#eaf0ff);border:1px solid #dbe5ff}
+.timebar .lab{font-size:12px;color:var(--sub)}
+.timebar .val{font-size:15px;font-weight:700;color:var(--brand);letter-spacing:.4px}
+.timebar .unit{font-size:11px;color:var(--sub)}
+
+#dlgImg{border:0;background:transparent;box-shadow:none;width:auto;max-width:92vw;padding:0}
+#dlgImg .big{max-width:86vw;max-height:80vh;border-radius:12px;display:block;box-shadow:0 24px 60px rgba(15,30,60,.4)}
+#dlgImg .cap{color:#fff;text-align:center;font-size:13px;margin-top:10px}
+.foot-note{font-size:12px;color:var(--sub);margin-top:14px;text-align:center}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><div class="logo">库</div><div>库存工作台<small>INVENTORY WORKBENCH</small></div></div>
+
+  <div class="clock" title="系统实时日期与时间">
+    <div>
+      <div class="d" id="clockDate">----/--/--</div>
+      <div class="w" id="clockWeek">星期—</div>
+    </div>
+    <div class="t num" id="clockTime">--:--:--</div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="field"><span>业务日期</span><input type="date" id="bizDate"><button class="btn ghost" id="btnToday">今天</button></div>
+  <div class="field"><span>数量精度</span>
+    <select id="precision">
+      <option value="0">整数 0 位</option>
+      <option value="1">0.1 (1 位)</option>
+      <option value="2">0.01 (2 位)</option>
+      <option value="3" selected>0.001 (3 位)</option>
+      <option value="4">0.0001 (4 位)</option>
+    </select>
+  </div>
+  <div class="field sync">
+    <span>数据同步</span>
+    <button class="btn ghost" id="btnBak" title="把当前全部数据导出成备份文件，可在其它浏览器导入">导出备份</button>
+    <button class="btn ghost" id="btnImp" title="从备份文件恢复数据">导入恢复</button>
+    <button class="btn ghost" id="btnShare" title="生成一条带数据的网址，在别的浏览器地址栏粘贴即可继续使用">复制分享链接</button>
+    <span class="badge" id="saveState">已保存</span>
+  </div>
+</header>
+<input type="file" id="impFile" accept=".json,application/json" style="display:none">
+
+<div class="wrap">
+
+  <section class="cards">
+    <div class="card">
+      <div class="k">库存总数量</div>
+      <div class="v num" id="sumQty">0</div>
+      <div class="s" id="sumQtySub">按当前精度精确求和</div>
+    </div>
+    <div class="card">
+      <div class="k">库存总成本（采购价口径）</div>
+      <div class="v num" id="sumCost">¥0.00</div>
+      <div class="s" id="sumCostSub">数量 × 采购价格</div>
+    </div>
+    <div class="card sale">
+      <div class="k">库存总货值（售价口径）</div>
+      <div class="v num" id="sumSale">¥0.00</div>
+      <div class="s" id="sumSaleSub">数量 × 售价</div>
+    </div>
+    <div class="card alt">
+      <div class="k">潜在毛利</div>
+      <div class="v num" id="sumProfit">¥0.00</div>
+      <div class="s" id="sumProfitSub">售价口径 − 采购价口径</div>
+    </div>
+    <div class="card ok">
+      <div class="k">品类的数量</div>
+      <div class="v num" id="sumSku">0<span class="u">个品类</span></div>
+      <div class="s" id="sumSkuSub">品类数量无上限，可任意新增</div>
+    </div>
+    <div class="card warn">
+      <div class="k">预警 / 缺货</div>
+      <div class="v num" id="sumWarn">0<span class="u">项</span></div>
+      <div class="s" id="sumWarnSub">低于安全库存 / 数量为 0</div>
+    </div>
+  </section>
+
+  <section class="toolbar">
+    <div class="grow search"><input id="kw" placeholder="搜索商品编码 / 名称 / 规格 / 备注"></div>
+    <select id="fCategory" class="btn sel" style="max-width:280px"></select>
+    <button class="btn" id="btnCat">品类管理</button>
+    <select id="fStatus" class="btn sel">
+      <option value="">全部状态</option>
+      <option value="ok">充足</option>
+      <option value="warn">预警</option>
+      <option value="danger">缺货</option>
+    </select>
+    <select id="fTime" class="btn sel" title="按出入库时间筛选">
+      <option value="">全部出入库时间</option>
+      <option value="today">今日有出入库</option>
+      <option value="3d">近 3 天有出入库</option>
+      <option value="7d">近 7 天有出入库</option>
+      <option value="none">从未出入库</option>
+    </select>
+    <select id="fImg" class="btn sel" title="按图片筛选">
+      <option value="">全部图片</option>
+      <option value="has">已有图片</option>
+      <option value="no">无图片</option>
+    </select>
+    <select id="fPrice" class="btn sel" title="按价格筛选">
+      <option value="">全部价格</option>
+      <option value="nosale">未设置售价</option>
+      <option value="neg">售价低于采购价</option>
+      <option value="gap">有毛利</option>
+    </select>
+    <div class="seg" id="qtySort" title="排序">
+      <button data-sort="" class="on">默认</button>
+      <button data-sort="desc">数量↓</button>
+      <button data-sort="asc">数量↑</button>
+      <button data-sort="pdesc">毛利↓</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnExport">导出 CSV</button>
+    <button class="btn primary" id="btnNew">+ 新增商品</button>
+    <button class="btn" id="btnReset">恢复示例数据</button>
+  </section>
+
+  <section class="panel">
+    <div class="head">
+      <h3>商品库存明细</h3>
+      <span class="sub" id="tblSub"></span>
+      <div style="flex:1"></div>
+      <span class="sub">数量按精度精确显示 · 时间精确到秒 · 编码可修改 · 品类数量无上限</span>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="c">图片</th>
+            <th>商品编码</th>
+            <th>商品名称</th>
+            <th>规格</th>
+            <th>品类</th>
+            <th>采购链接</th>
+            <th class="r">当前库存</th>
+            <th class="r">安全库存</th>
+            <th>最近入库时间</th>
+            <th>最近出库时间</th>
+            <th class="r">库存金额</th>
+            <th class="r">货值(售价)</th>
+            <th class="r">毛利率</th>
+            <th class="c">状态</th>
+            <th class="c">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div id="emptyTip" class="empty" style="display:none">没有符合条件的商品</div>
+  </section>
+
+  <section class="panel" style="margin-top:18px">
+    <div class="head">
+      <h3>待采购清单</h3>
+      <span class="sub" id="buySub"></span>
+      <div style="flex:1"></div>
+      <span class="sub">创建日期自动记录 · 期望到货日期逾期红色提醒 · 点「完成」= 采购完成，到货后直接点「入库」即入账</span>
+      <button class="btn primary" id="btnNewBuy">+ 新增待采购</button>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="c">状态</th>
+            <th>商品</th>
+            <th class="r">待采购数量</th>
+            <th>期望到货日期</th>
+            <th>创建日期</th>
+            <th>采购完成日期</th>
+            <th>入库日期</th>
+            <th>备注</th>
+            <th class="c">操作</th>
+          </tr>
+        </thead>
+        <tbody id="buyBody"></tbody>
+      </table>
+    </div>
+    <div id="buyEmpty" class="empty" style="display:none">暂无待采购，点右上角「+ 新增待采购」添加</div>
+  </section>
+
+  <section class="panel" style="margin-top:18px">
+    <div class="head">
+      <h3>出入库流水</h3>
+      <span class="sub" id="flowSub"></span>
+      <div style="flex:1"></div>
+      <button class="btn ghost" id="btnClearFlow">清空流水</button>
+    </div>
+    <div class="tbl-scroll flow">
+      <table>
+        <thead>
+          <tr>
+            <th>类型</th><th>操作时间</th><th>业务日期</th><th class="c">图片</th><th>商品</th>
+            <th class="r">数量变动</th><th class="r">变动前</th><th class="r">变动后</th><th>备注</th>
+          </tr>
+        </thead>
+        <tbody id="flowBody"></tbody>
+      </table>
+    </div>
+    <div id="flowEmpty" class="empty">暂无流水记录</div>
+  </section>
+
+  <div class="foot-note">每次操作都会即时写入本机浏览器（localStorage），顶栏「已保存」会显示写入时间 · 换浏览器 / 换电脑：顶栏「导出备份 → 导入恢复」，或「复制分享链接」把整份数据带在网址上，在新浏览器地址栏粘贴即可继续使用 · 数量以万分之一为单位定点存储，加减法无浮点误差 · 金额按分精确保存 · 出入库时间精确到秒 · 品类数量无上限 · 待采购支持 待采购 → 已采购待到货 → 已入库 三态</div>
+</div>
+
+<!-- ============ 商品信息 + 图片 表单（新增 / 编辑共用） ============ -->
+<dialog id="dlgForm">
+  <form id="formGoods" onsubmit="return false">
+    <div class="dlg-body">
+      <h3 id="fmTitle">新增商品</h3>
+      <div class="hint" id="fmSub"></div>
+
+      <div class="timebar">
+        <span class="lab" id="fmTimeLab">操作时间</span>
+        <span class="val num" id="fmNow">--:--:--</span>
+        <span class="unit" id="fmNowDate">----/--/--</span>
+      </div>
+
+      <div class="sec">商品图片</div>
+      <div class="imgpick">
+        <div class="imgbox" id="imgBox" title="点击选择图片，或把图片拖进来">
+          <div class="ph-txt" id="imgPh"><b>＋</b>点击 / 拖拽上传图片</div>
+          <img id="imgPrev" alt="商品图片" style="display:none">
+          <div class="overlay" id="imgOverlay" style="display:none">更换图片</div>
+        </div>
+        <div class="imgside">
+          <div class="tip">
+            支持 PNG / JPG / GIF / WEBP，可直接拖拽，也支持 Ctrl+V 粘贴。<br>
+            图片会自动等比压缩（最长边 420px）后保存，不占空间。<br>
+            <span class="badge" id="imgInfo">未选择图片</span>
+          </div>
+          <div class="row">
+            <button type="button" class="btn" id="imgPick">选择图片</button>
+            <button type="button" class="btn danger" id="imgClear">移除图片</button>
+          </div>
+          <input type="file" id="imgFile" accept="image/*" style="display:none">
+        </div>
+      </div>
+
+      <div class="sec">商品信息</div>
+      <div class="grid2">
+        <div class="form-row">
+          <label>商品编码 * <span class="editable">可修改</span></label>
+          <input id="fdCode" class="num" autocomplete="off" placeholder="如 WL-2008">
+        </div>
+        <div class="form-row"><label>商品名称 *</label><input id="fdName" autocomplete="off" placeholder="如 深沟球轴承"></div>
+      </div>
+      <div class="grid3">
+        <div class="form-row"><label>规格型号</label><input id="fdSpec" autocomplete="off" placeholder="6204-2RS"></div>
+        <div class="form-row">
+          <label>品类 <span class="free">数量无上限</span></label>
+          <select id="fdCat"></select>
+        </div>
+        <div class="form-row"><label>计量单位</label><input id="fdUnit" autocomplete="off" placeholder="个"></div>
+      </div>
+      <div class="form-row" id="fdCatNewRow" style="display:none">
+        <label>新品类名称</label>
+        <input id="fdCatNew" autocomplete="off" placeholder="输入新的品类名称，例如 密封件">
+      </div>
+
+      <div class="sec">价格（采购价 / 售价）</div>
+      <div class="grid4">
+        <div class="form-row"><label>采购价格（元）</label><input id="fdCost" class="num" autocomplete="off" placeholder="3.60"></div>
+        <div class="form-row"><label>售价（元）</label><input id="fdSale" class="num" autocomplete="off" placeholder="5.80"></div>
+        <div class="form-row"><label>当前库存 / 期初数量</label><input id="fdQty" class="num" autocomplete="off" placeholder="0"></div>
+        <div class="form-row"><label>安全库存</label><input id="fdSafe" class="num" autocomplete="off" placeholder="0"></div>
+      </div>
+      <div class="calcbox" id="fdCalc">
+        <span>单位毛利 <b id="calcGap">—</b></span>
+        <span>毛利率 <b id="calcRate">—</b></span>
+        <span>库存成本 <b id="calcCost">—</b></span>
+        <span>库存货值（售价） <b id="calcAmt">—</b></span>
+      </div>
+
+      <div class="grid2">
+        <div class="form-row"><label>库位</label><input id="fdLoc" autocomplete="off" placeholder="如 A区-03-2"></div>
+        <div class="form-row"><label>供应商</label><input id="fdVendor" autocomplete="off" placeholder="如 华腾紧固件"></div>
+      </div>
+      <div class="form-row">
+        <label>采购链接（选填）</label>
+        <input id="fdLink" autocomplete="off" placeholder="采购页面网址，如 https://detail.1688.com/offer/xxx.html">
+      </div>
+      <div class="form-row"><label>操作时间（精确到秒）</label><input type="datetime-local" step="1" id="fdTime"></div>
+      <div class="form-row"><label>备注 / 商品说明</label><textarea id="fdNote" rows="2" placeholder="选填，如：常用件，每月补货一次"></textarea></div>
+
+      <div class="err" id="fdErr"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" id="fdNowBtn" title="填入当前时间">用当前时间</button>
+      <button type="button" class="btn" id="fdManageCat">品类管理</button>
+      <div style="flex:1"></div>
+      <button type="button" class="btn" id="fdCancel">取消</button>
+      <button type="button" class="btn primary" id="fdOk">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ 品类管理 ============ -->
+<dialog id="dlgCat" class="wide">
+  <div class="dlg-body">
+    <h3>品类管理</h3>
+    <div class="hint">品类数量<strong>不设上限</strong>，可任意新增、重命名、删除；筛选与商品表单会同步更新</div>
+    <div class="cat-add">
+      <input id="catNewInput" placeholder="输入新品类名称，例如 密封件 / 五金 / 化工原料">
+      <button type="button" class="btn primary" id="catAddBtn">＋ 添加品类</button>
+    </div>
+    <div class="cat-list" id="catListBox"></div>
+    <div class="err" id="catErr"></div>
+  </div>
+  <div class="dlg-foot">
+    <span class="badge" id="catCount">共 0 个品类 · 无上限</span>
+    <div style="flex:1"></div>
+    <button type="button" class="btn" id="catClose">关闭</button>
+  </div>
+</dialog>
+
+<!-- ============ 入库 / 出库 ============ -->
+<dialog id="dlgMove" class="narrow">
+  <form id="formMove" onsubmit="return false">
+    <div class="dlg-body">
+      <h3 id="mvTitle">入库</h3>
+      <div class="hint" id="mvSub"></div>
+
+      <div class="timebar">
+        <span class="lab">当前系统时间</span>
+        <span class="val num" id="mvNow">--:--:--</span>
+        <span class="unit" id="mvNowDate">----/--/--</span>
+      </div>
+
+      <div class="form-row"><label>数量（支持最多 4 位小数）</label><input id="mvQty" class="num" autocomplete="off" placeholder="例如 1200.5"></div>
+      <div class="form-row"><label>操作时间（精确到秒，可修改）</label><input type="datetime-local" step="1" id="mvTime"></div>
+      <div class="form-row"><label>业务日期（默认取操作时间所在日期）</label><input type="date" id="mvDate"></div>
+      <div class="form-row"><label>备注</label><input id="mvRemark" autocomplete="off" placeholder="选填，如：采购入库 / 生产领用"></div>
+      <div class="err" id="mvErr"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" id="mvNowBtn" title="填入当前时间">用当前时间</button>
+      <div style="flex:1"></div>
+      <button type="button" class="btn" id="mvCancel">取消</button>
+      <button type="button" class="btn primary" id="mvOk">确认</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ 待采购（新增 / 编辑共用） ============ -->
+<dialog id="dlgBuy" class="narrow">
+  <form id="formBuy" onsubmit="return false">
+    <div class="dlg-body">
+      <h3 id="byTitle">新增待采购</h3>
+      <div class="hint" id="bySub2">创建日期自动取今天 · 期望到货日期必填</div>
+
+      <div class="timebar">
+        <span class="lab">当前系统时间</span>
+        <span class="val num" id="byNow">--:--:--</span>
+        <span class="unit" id="byNowDate">----/--/--</span>
+      </div>
+
+      <div class="form-row">
+        <label>采购商品</label>
+        <select id="byProd"></select>
+      </div>
+      <div class="grid2" id="byManualRow" style="display:none">
+        <div class="form-row"><label>商品名称 *</label><input id="byName" autocomplete="off" placeholder="手工填写商品名称"></div>
+        <div class="form-row"><label>计量单位</label><input id="byUnit" autocomplete="off" placeholder="个"></div>
+      </div>
+      <div class="buy-prev" id="byPrev" style="display:none">
+        <img class="bp-img" id="byImg" alt="商品图片" title="点击查看大图" style="display:none">
+        <div class="bp-ph" id="byImgPh">无图</div>
+        <div class="bp-main">
+          <div class="bp-name" id="byPName"></div>
+          <div class="bp-meta" id="byPMeta"></div>
+          <div class="bp-link">
+            <a class="plink" id="byPLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none"></a>
+            <span class="nosale" id="byPNoLink">该商品未填写采购链接，可在商品「编辑」里补充</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-row"><label>采购数量（支持最多 4 位小数）</label><input id="byQty" class="num" autocomplete="off" placeholder="例如 500"></div>
+      <div class="form-row"><label>期望到货日期 *</label><input type="date" id="byPlan"></div>
+      <div class="form-row"><label>备注</label><input id="byRemark" autocomplete="off" placeholder="选填，如：供应商已下单 / 月结"></div>
+      <div class="err" id="byErr"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" class="btn" id="byTodayBtn" title="期望到货日期设为今天">今天到货</button>
+      <div style="flex:1"></div>
+      <button type="button" class="btn" id="byCancel">取消</button>
+      <button type="button" class="btn primary" id="byOk">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgImg">
+  <div>
+    <img id="bigImg" class="big" alt="商品大图">
+    <div class="cap" id="bigCap"></div>
+  </div>
+</dialog>
+
+<script>
+/* ===== 定点内核：数量 1/10000 为单位，金额 分 为单位，加减精确 ===== */
+const SCALE = 10000;
+const DEC_MAX = 4;
+
+function parseQty(str){
+  const s = String(str==null?'':str).trim().replace(/,/g,'');
+  if(s === '') return null;
+  if(!/^-?\d+(\.\d{1,4})?$/.test(s)) return null;
+  const neg = s.startsWith('-');
+  const [i,f=''] = s.replace('-','').split('.');
+  const v = Number(i)*SCALE + Number((f+'0000').slice(0,DEC_MAX));
+  return neg ? -v : v;
+}
+function fmtQty(v, decimals){
+  if(decimals === undefined) decimals = state.precision;
+  const neg = v < 0, a = Math.abs(v);
+  const unit = Math.pow(10, decimals);
+  const rounded = Math.round(a / (SCALE/unit));
+  const ip = Math.floor(rounded/unit), fp = rounded % unit;
+  let out = ip.toLocaleString('en-US');
+  if(decimals > 0) out += '.' + String(fp).padStart(decimals,'0');
+  return (neg?'-':'') + out;
+}
+function fmtMoney(cents){
+  if(cents === null || cents === undefined) return '—';
+  const neg = cents < 0, a = Math.abs(cents);
+  const ip = Math.floor(a/100), fp = a % 100;
+  return (neg?'-':'') + '¥' + ip.toLocaleString('en-US') + '.' + String(fp).padStart(2,'0');
+}
+/** 金额（分）→ 输入框用的元字符串（无千分位） */
+function toYuan(cents){
+  if(cents === null || cents === undefined) return '';
+  return (cents/100).toFixed(2);
+}
+/** 元字符串 → 分（精确两位；允许最多 2 位小数） */
+function parseMoney(str){
+  const s = String(str==null?'':str).trim().replace(/,/g,'');
+  if(s === '') return null;                         // 空 = 未设置
+  if(!/^-?\d+(\.\d{1,2})?$/.test(s)) return NaN;    // NaN = 格式错误
+  const neg = s.startsWith('-');
+  const [i,f=''] = s.replace('-','').split('.');
+  const v = Number(i)*100 + Number((f+'00').slice(0,2));
+  return neg ? -v : v;
+}
+
+/* ===== 状态 ===== */
+const LS_KEY = 'inventory-workbench-v3';
+let state = { precision:3, products:[], flows:[], categories:[], purchases:[], bizDate:'' };
+
+/* 示例商品：[编码,名称,规格,品类,单位,数量,安全库存,采购价格,售价,库位,供应商,备注,采购链接] */
+const SEED = [
+  ['WL-1001','内六角不锈钢螺栓','M8×40','紧固件','个', 12500.5, 5000, 1.25, 2.20, 'A区-01-1','华腾紧固件','常用件，每月补货一次','https://detail.1688.com/offer/682341900811.html'],
+  ['WL-1002','六角螺母','M8 304','紧固件','个', 38420, 8000, 0.42, 0.80, 'A区-01-2','华腾紧固件','',''],
+  ['WL-1003','平垫圈','Φ8 镀锌','紧固件','个', 6.75, 100, 0.08, 0.15, 'A区-01-3','华腾紧固件','库存偏低，需补货',''],
+  ['ZC-2001','深沟球轴承','6204-2RS','轴承','套', 328.125, 150, 12.60, 22.00, 'B区-02-1','洛轴经销商','','https://item.taobao.com/item.htm?id=723456789012'],
+  ['ZC-2002','圆锥滚子轴承','30206','轴承','套', 0, 60, 36.80, 58.00, 'B区-02-2','洛轴经销商','缺货，已下单',''],
+  ['DJ-3001','漆包线','QZ-2 Φ0.5','电气','千克', 842.3755, 200, 68.50, 92.00, 'C区-01-1','铜业物资','',''],
+  ['DJ-3002','热缩管','Φ6 黑','电气','米', 15200.25, 3000, 0.55, 0.95, 'C区-01-2','铜业物资','',''],
+  ['YY-4001','液压油','46# 18L','油料','桶', 46.5, 20, 268.00, 358.00, 'D区-01-1','壳牌代理','',''],
+  ['YY-4002','润滑脂','锂基 2#','油料','千克', 128.75, 50, 24.30, 36.00, 'D区-01-2','壳牌代理','',''],
+  ['BZ-5001','缠绕膜','50cm×2.5kg','包装','卷', 210, 80, 18.90, 26.00, 'E区-01-1','包装耗材城','',''],
+  ['BZ-5002','瓦楞纸箱','600×400×400','包装','个', 980.5, 300, 4.65, 6.80, 'E区-01-2','包装耗材城','',''],
+  ['GJ-6001','硬质合金铣刀','Φ10 四刃','刀具','支', 78.25, 30, 158.00, 228.00, 'F区-01-1','山特工具','','https://detail.1688.com/offer/675889900123.html'],
+  ['GJ-6002','数控刀片','CNMG120408','刀具','片', 1240.75, 400, 32.40, 48.00, 'F区-01-2','山特工具','',''],
+  ['PB-7001','PLC 输入模块','SM1221','备件','块', 12.5, 8, 860.00, 1180.00, 'G区-01-1','西门子代理','关键备件','https://www.siemens.com/cn/zh/products/automation.html'],
+  ['PB-7002','接近开关','M18 常开','备件','只', 96, 40, 45.60, 68.00, 'G区-01-2','西门子代理','','']
+];
+const SEED_CATS = ['紧固件','轴承','电气','油料','包装','刀具','备件'];
+
+function seed(){
+  state.categories = SEED_CATS.slice();
+  state.products = SEED.map(r=>({
+    code:r[0], name:r[1], spec:r[2], cat:r[3], unit:r[4],
+    qty: parseQty(String(r[5])), safe: parseQty(String(r[6])),
+    cost: Math.round(r[7]*100), sale: Math.round(r[8]*100),
+    loc:r[9], vendor:r[10], note:r[11], link:r[12] || '', image:''
+  }));
+  state.flows = [];
+  const now = new Date();
+  state.bizDate = ymd(now);
+  const yd = new Date(now.getTime() - 86400000);
+  const dstr = off => ymd(new Date(now.getTime() + off*86400000));
+  /* 示例待采购：昨天（已逾期）、今天（今日到期）、3 天后（待采购） */
+  state.purchases = [
+    {id:'Bseed1', code:'ZC-2002', name:'圆锥滚子轴承', unit:'套', qty:parseQty('60'),
+     plan:dstr(-1), created:dstr(-3), remark:'缺货补货，供应商已发货',
+     done:false, doneDate:'', stocked:false, stockedDate:'', inFlowId:''},
+    {id:'Bseed2', code:'WL-1003', name:'平垫圈', unit:'个', qty:parseQty('2000'),
+     plan:dstr(0), created:dstr(-2), remark:'库存偏低，预计今天到货',
+     done:false, doneDate:'', stocked:false, stockedDate:'', inFlowId:''},
+    {id:'Bseed3', code:'DJ-3001', name:'漆包线', unit:'千克', qty:parseQty('100'),
+     plan:dstr(3), created:dstr(1), remark:'月度补货，已下采购单，等货到直接点入库',
+     done:true, doneDate:dstr(1), stocked:false, stockedDate:'', inFlowId:''}
+  ];
+  state.flows.push({ts: now.getTime()-3600e3, biz: ymd(now), kind:'in',
+    code:'WL-1001', name:'内六角不锈钢螺栓', unit:'个',
+    delta: parseQty('2500.5'), before: parseQty('10000'), after: parseQty('12500.5'), remark:'采购入库'});
+  state.flows.push({ts: yd.getTime()+10*3600e3+32*60e3+15e3, biz: ymd(yd), kind:'out',
+    code:'DJ-3001', name:'漆包线', unit:'千克',
+    delta: parseQty('-157.6245'), before: parseQty('1000'), after: parseQty('842.3755'), remark:'生产领用'});
+  state.flows.push({ts: yd.getTime()+9*3600e3+5*60e3+48e3, biz: ymd(yd), kind:'in',
+    code:'GJ-6002', name:'数控刀片', unit:'片',
+    delta: parseQty('240.75'), before: parseQty('1000'), after: parseQty('1240.75'), remark:'采购入库'});
+  state.flows.push({ts: yd.getTime()+14*3600e3+21*60e3+6e3, biz: ymd(yd), kind:'out',
+    code:'WL-1002', name:'六角螺母', unit:'个',
+    delta: parseQty('-1580'), before: parseQty('40000'), after: parseQty('38420'), remark:'生产领用'});
+}
+
+/** 旧数据迁移 + 结构校验：返回规范化后的状态对象，不合法返回 null（载入 / 导入备份 / 分享链接共用） */
+function normalizeState(d){
+  if(!d || !Array.isArray(d.products) || !d.products.length) return null;
+  if(!Array.isArray(d.flows)) d.flows = [];
+  if(!Array.isArray(d.categories)) d.categories = [];
+  if(!Array.isArray(d.purchases)) d.purchases = [];
+  if(typeof d.precision !== 'number') d.precision = 3;
+  if(!d.bizDate) d.bizDate = ymd(new Date());
+  d.products.forEach(p=>{
+    if(p.cost === undefined) p.cost = (p.price !== undefined ? p.price : 0);   // 旧字段 price → cost
+    if(p.sale === undefined) p.sale = null;                                    // 售价可空
+    if(p.link === undefined) p.link = '';                                      // 旧数据补采购链接
+    if(p.image === undefined) p.image = '';
+    if(p.safe === undefined) p.safe = 0;
+    delete p.price;
+  });
+  d.flows.forEach(f=>{
+    if(!f.ts) f.ts = Date.now();
+    if(!f.biz) f.biz = ymd(new Date(f.ts));
+    if(!f.kind) f.kind = f.delta > 0 ? 'in' : 'out';
+    if(!f.fid) f.fid = 'F'+f.ts.toString(36)+Math.random().toString(36).slice(2,5);
+  });
+  d.purchases.forEach(b=>{
+    if(!b.created) b.created = ymd(new Date());
+    if(b.done === undefined) b.done = false;            // 采购完成
+    if(b.doneDate === undefined) b.doneDate = '';
+    if(b.stocked === undefined) b.stocked = false;      // 已入库
+    if(b.stockedDate === undefined) b.stockedDate = '';
+    if(b.inFlowId === undefined) b.inFlowId = '';
+  });
+  return d;
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const d = normalizeState(JSON.parse(raw));
+      if(d){ state = Object.assign(state, d); syncCategories(); return; }
+    }
+  }catch(e){}
+  seed();
+}
+function save(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    const el = document.getElementById('saveState');
+    if(el){
+      el.textContent = '已保存 '+hms(Date.now());
+      el.classList.add('flash');
+      setTimeout(()=>el.classList.remove('flash'), 700);
+    }
+  }
+  catch(e){ alert('保存失败：本机存储空间已满，请先移除部分商品图片。'); }
+}
+
+/* ===== 品类（数量无上限） ===== */
+function syncCategories(){
+  const set = new Set(state.categories.map(c=>String(c).trim()).filter(Boolean));
+  state.products.forEach(p=>{ if(p.cat) set.add(p.cat); });
+  state.categories = [...set];
+}
+function allCategories(){
+  syncCategories();
+  return state.categories.slice().sort((a,b)=>a.localeCompare(b,'zh'));
+}
+function addCategory(name){
+  const n = String(name||'').trim();
+  if(!n) return false;
+  if(!state.categories.includes(n)) state.categories.push(n);
+  return true;
+}
+function countByCat(name){ return state.products.filter(p=>p.cat === name).length; }
+function renameCategory(oldName){
+  const n = prompt('重命名为：', oldName);
+  if(n === null) return;
+  const v = n.trim();
+  if(!v || v === oldName) return;
+  if(state.categories.includes(v)) return alert('品类「'+v+'」已存在');
+  state.categories = state.categories.map(c=>c === oldName ? v : c);
+  state.products.forEach(p=>{ if(p.cat === oldName) p.cat = v; });
+  save(); render(); renderCatList();
+}
+function deleteCategory(name){
+  const n = countByCat(name);
+  const msg = n ? '品类「'+name+'」下还有 '+n+' 个商品，删除后这些商品将变为「未分类」。确认删除？'
+                : '确认删除品类「'+name+'」？';
+  if(!confirm(msg)) return;
+  state.categories = state.categories.filter(c=>c !== name);
+  if(n){ state.products.forEach(p=>{ if(p.cat === name) p.cat = '未分类'; }); addCategory('未分类'); }
+  save(); render(); renderCatList();
+}
+function renderCatList(){
+  const list = allCategories();
+  document.getElementById('catListBox').innerHTML = list.length ? list.map(c=>{
+    const n = countByCat(c);
+    return '<div class="cat-row">'
+      +'<span class="nm '+(n?'':'zero')+'">'+esc(c)+'</span>'
+      +'<span class="badge">'+n+' 个商品</span>'
+      +(n?'':'<span class="empty-cat">空品类</span>')
+      +'<div style="flex:1"></div>'
+      +'<button type="button" class="mini edit" data-cat-act="rename" data-cat="'+esc(c)+'">重命名</button>'
+      +'<button type="button" class="mini del"  data-cat-act="del"    data-cat="'+esc(c)+'" title="删除">✕</button>'
+      +'</div>';
+  }).join('') : '<div class="empty" style="padding:22px">还没有品类，在上方输入框添加</div>';
+  document.getElementById('catCount').textContent = '共 '+list.length+' 个品类 · 无上限';
+}
+
+/* ===== 日期 / 时间 ===== */
+const WEEK = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+const p2 = n => String(n).padStart(2,'0');
+function ymd(d){ return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
+function hms(ts){ const d=new Date(ts); return p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds()); }
+function dtFull(ts){ return ymd(new Date(ts))+' '+hms(ts); }
+function dtShort(ts){ const d=new Date(ts); return p2(d.getMonth()+1)+'-'+p2(d.getDate())+' '+hms(ts); }
+function dtLocal(ts){ const d=new Date(ts); return ymd(d)+'T'+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds()); }
+function ymdCn(s){ if(!s) return '—'; const [y,m,d]=s.split('-'); return y+'年'+Number(m)+'月'+Number(d)+'日'; }
+function parseLocal(v){ if(!v) return null; const t=new Date(v).getTime(); return isNaN(t)?null:t; }
+
+function tick(){
+  const d = new Date();
+  document.getElementById('clockDate').textContent = d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  document.getElementById('clockWeek').textContent = WEEK[d.getDay()];
+  document.getElementById('clockTime').textContent = hms(d.getTime());
+  if(dlgMove.open){
+    document.getElementById('mvNow').textContent = hms(d.getTime());
+    document.getElementById('mvNowDate').textContent = ymd(d)+' '+WEEK[d.getDay()];
+  }
+  if(dlgForm.open){
+    document.getElementById('fmNow').textContent = hms(d.getTime());
+    document.getElementById('fmNowDate').textContent = ymd(d)+' '+WEEK[d.getDay()];
+  }
+  if(dlgBuy.open){
+    document.getElementById('byNow').textContent = hms(d.getTime());
+    document.getElementById('byNowDate').textContent = ymd(d)+' '+WEEK[d.getDay()];
+  }
+}
+
+/* ===== 计算 ===== */
+function statusOf(p){
+  if(p.qty <= 0) return 'danger';
+  if(p.qty < p.safe) return 'warn';
+  return 'ok';
+}
+const STATUS_TXT = {ok:'充足', warn:'预警', danger:'缺货'};
+const KIND_TXT = {in:'入库', out:'出库', adj:'库存调整'};
+/** 库存成本（分）= 数量 × 采购价格 */
+function costCents(p){ return Math.round(p.qty * (p.cost||0) / SCALE); }
+/** 库存货值（分）= 数量 × 售价 */
+function saleCents(p){ return Math.round(p.qty * (p.sale||0) / SCALE); }
+/** 毛利率 = (售价 − 采购价) / 售价 */
+function grossRate(p){
+  if(!p.sale || p.sale <= 0) return null;
+  return (p.sale - (p.cost||0)) / p.sale;
+}
+function grossText(p){
+  const r = grossRate(p);
+  if(r === null) return '<span class="nosale">未设置售价</span>';
+  const pct = (r*100).toFixed(1)+'%';
+  return '<span style="color:'+(r<0?'var(--danger)':'var(--ok)')+'">'+pct+'</span>';
+}
+/** 采购链接 */
+function linkHost(u){
+  try{ return new URL(u).host.replace(/^www\./,''); }catch(e){ return String(u); }
+}
+function linkCell(u){
+  if(!u) return '<span class="nosale">—</span>';
+  return '<a class="plink" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" title="'+esc(u)+'">'
+    + esc(linkHost(u)) +' ↗</a>';
+}
+
+function lastMove(code, dir){
+  let t = null;
+  for(const f of state.flows){
+    if(f.code !== code) continue;
+    const hit = dir === 'in' ? f.delta > 0 : f.delta < 0;
+    if(hit && (t === null || f.ts > t)) t = f.ts;
+  }
+  return t;
+}
+const DAY = 86400000;
+
+/* ===== 待采购：日期计算 ===== */
+/** 期望到货日期 与 今天 的差（天）；负数 = 已逾期 */
+function daysUntil(plan){
+  if(!plan) return 0;
+  const t = new Date(); t.setHours(0,0,0,0);
+  const p = new Date(String(plan)+'T00:00:00');
+  if(isNaN(p.getTime())) return 0;
+  return Math.round((p.getTime() - t.getTime()) / DAY);
+}
+function planHint(plan, done){
+  if(done) return '';
+  const d = daysUntil(plan);
+  if(d < 0)  return '已逾期 '+(-d)+' 天';
+  if(d === 0) return '今天到期';
+  if(d === 1) return '明天到期';
+  return '还有 '+d+' 天';
+}
+
+function filtered(){
+  const kw = document.getElementById('kw').value.trim().toLowerCase();
+  const cat = document.getElementById('fCategory').value;
+  const st = document.getElementById('fStatus').value;
+  const tf = document.getElementById('fTime').value;
+  const im = document.getElementById('fImg').value;
+  const pf = document.getElementById('fPrice').value;
+  const now = Date.now();
+  let list = state.products.filter(p=>{
+    if(cat && p.cat !== cat) return false;
+    if(st && statusOf(p) !== st) return false;
+    if(im === 'has' && !p.image) return false;
+    if(im === 'no' && p.image) return false;
+    if(pf === 'nosale' && p.sale) return false;
+    if(pf === 'neg' && !(p.sale && p.sale < (p.cost||0))) return false;
+    if(pf === 'gap' && !(p.sale && p.sale > (p.cost||0))) return false;
+    if(kw){
+      const hay = (p.code+' '+p.name+' '+p.spec+' '+(p.note||'')+' '+(p.vendor||'')+' '+(p.loc||'')+' '+(p.cat||'')).toLowerCase();
+      if(hay.indexOf(kw) === -1) return false;
+    }
+    if(tf){
+      const li = lastMove(p.code,'in'), lo = lastMove(p.code,'out');
+      const last = Math.max(li||0, lo||0);
+      if(tf === 'none'){ if(last) return false; }
+      else if(tf === 'today'){
+        const t0 = new Date(); t0.setHours(0,0,0,0);
+        if(last < t0.getTime()) return false;
+      }else{
+        const days = tf === '3d' ? 3 : 7;
+        if(!last || now - last > days*DAY) return false;
+      }
+    }
+    return true;
+  });
+  if(currentSort === 'desc') list = list.slice().sort((a,b)=>b.qty-a.qty);
+  if(currentSort === 'asc')  list = list.slice().sort((a,b)=>a.qty-b.qty);
+  if(currentSort === 'pdesc') list = list.slice().sort((a,b)=>{
+    const ga = (a.sale||0)-(a.cost||0), gb = (b.sale||0)-(b.cost||0);
+    return gb - ga;
+  });
+  return list;
+}
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+/* ===== 渲染 ===== */
+function render(){
+  const dec = state.precision;
+
+  let total = 0, cost = 0, sale = 0, warn = 0, out = 0;
+  state.products.forEach(p=>{
+    total += p.qty;
+    cost += costCents(p);
+    sale += saleCents(p);
+    const s = statusOf(p);
+    if(s === 'warn') warn++;
+    if(s === 'danger') out++;
+  });
+  const cats = allCategories();
+  const profit = sale - cost;
+  const costRate = sale > 0 ? (profit/sale*100).toFixed(1)+'%' : '—';
+
+  document.getElementById('sumQty').textContent = fmtQty(total, dec);
+  document.getElementById('sumQtySub').textContent = '共 '+state.products.length+' 种商品 · 精度 '+dec+' 位小数';
+  document.getElementById('sumCost').textContent = fmtMoney(cost);
+  document.getElementById('sumCostSub').textContent = '按采购价格 · '+state.products.filter(p=>p.cost>0).length+' 个商品已定价';
+  document.getElementById('sumSale').textContent = fmtMoney(sale);
+  document.getElementById('sumSaleSub').textContent = '按售价 · '+state.products.filter(p=>p.sale).length+' 个商品已设售价';
+  document.getElementById('sumProfit').textContent = fmtMoney(profit);
+  document.getElementById('sumProfitSub').textContent = '综合毛利率 '+costRate;
+  document.getElementById('sumSku').innerHTML = cats.length+'<span class="u">个品类</span>';
+  document.getElementById('sumSkuSub').textContent = state.products.length+' 种商品 · 品类数量无上限';
+  document.getElementById('sumWarn').innerHTML = warn+'<span class="u">/</span>'+out+'<span class="u">项</span>';
+  document.getElementById('sumWarnSub').textContent = '预警 '+warn+' 项 · 缺货 '+out+' 项';
+
+  /* 品类筛选下拉（含空品类，无上限） */
+  const sel = document.getElementById('fCategory'), keep = sel.value;
+  sel.innerHTML = '<option value="">全部品类（共 '+cats.length+' 个）</option>'
+    + cats.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'（'+countByCat(c)+'）</option>').join('');
+  if(cats.includes(keep)) sel.value = keep;
+
+  /* 明细表 */
+  const list = filtered();
+  document.getElementById('tbody').innerHTML = list.map(p=>{
+    const s = statusOf(p);
+    const dim = p.qty <= 0 ? ' dim' : '';
+    const li = lastMove(p.code,'in'), lo = lastMove(p.code,'out');
+    const cell = (t,cls) => t
+      ? '<span class="time '+cls+'" title="'+dtFull(t)+'">'+dtShort(t)+'</span>'
+      : '<span class="time none">— 暂无</span>';
+    const thumb = p.image
+      ? '<img class="thumb" src="'+p.image+'" alt="'+esc(p.name)+'" data-img="'+p.code+'" title="'+esc(p.name)+'｜点击查看大图">'
+      : '<div class="thumb ph" title="暂无图片，点「编辑」可上传">无图</div>';
+    return '<tr>'
+      +'<td class="c">'+thumb+'</td>'
+      +'<td><span class="code">'+p.code+'</span></td>'
+      +'<td>'+esc(p.name)+(p.loc?'<div class="muted">库位 '+esc(p.loc)+'</div>':'')+'</td>'
+      +'<td class="muted">'+esc(p.spec)+'</td>'
+      +'<td><span class="catlink" data-cat-filter="'+esc(p.cat)+'" title="点击只看该品类">'+esc(p.cat)+'</span></td>'
+      +'<td>'+linkCell(p.link)+'</td>'
+      +'<td class="r"><span class="qty num'+dim+'">'+fmtQty(p.qty,dec)+'<span class="u">'+esc(p.unit)+'</span></span></td>'
+      +'<td class="r num muted">'+fmtQty(p.safe,dec)+'</td>'
+      +'<td>'+cell(li,'in')+'</td>'
+      +'<td>'+cell(lo,'out')+'</td>'
+      +'<td class="r num">'+fmtMoney(costCents(p))+'</td>'
+      +'<td class="r num">'+(p.sale ? fmtMoney(saleCents(p)) : '<span class="nosale">—</span>')+'</td>'
+      +'<td class="r">'+grossText(p)+'</td>'
+      +'<td class="c"><span class="tag '+s+'"><i class="dot"></i>'+STATUS_TXT[s]+'</span></td>'
+      +'<td class="c"><div class="ops" style="justify-content:center">'
+        +'<button class="mini in"   data-act="in"   data-code="'+p.code+'">入库</button>'
+        +'<button class="mini out"  data-act="out"  data-code="'+p.code+'">出库</button>'
+        +'<button class="mini edit" data-act="edit" data-code="'+p.code+'">编辑</button>'
+        +'<button class="mini del"  data-act="del"  data-code="'+p.code+'" title="删除">✕</button>'
+      +'</div></td>'
+    +'</tr>';
+  }).join('');
+  document.getElementById('emptyTip').style.display = list.length ? 'none' : 'block';
+  document.getElementById('tblSub').textContent =
+    '共 '+state.products.length+' 项'+(list.length !== state.products.length ? ' · 筛选出 '+list.length+' 项' : '')
+    +' · '+cats.length+' 个品类 · 业务日期 '+ymdCn(state.bizDate);
+
+  /* 待采购 */
+  renderPurchases();
+
+  /* 流水 */
+  const flows = state.flows.slice().sort((a,b)=>b.ts-a.ts);
+  document.getElementById('flowBody').innerHTML = flows.map(f=>{
+    const up = f.delta > 0;
+    const k = f.kind || (up ? 'in' : 'out');
+    const fp = state.products.find(x=>x.code === f.code);       // 图片按商品编码实时取当前商品图
+    const cell = (fp && fp.image)
+      ? '<img class="thumb sm" src="'+fp.image+'" data-fimg="'+esc(f.code)+'" alt="'+esc(f.name)+'" title="点击查看大图">'
+      : '<div class="thumb sm ph">无图</div>';
+    return '<tr>'
+      +'<td><span class="pill '+k+'">'+KIND_TXT[k]+'</span></td>'
+      +'<td><span class="time full">'+dtFull(f.ts)+'</span></td>'
+      +'<td><span class="time muted">'+ymdCn(f.biz)+'</span></td>'
+      +'<td class="c">'+cell+'</td>'
+      +'<td><span class="code">'+f.code+'</span> '+esc(f.name)+'</td>'
+      +'<td class="r delta '+(up?'up':'down')+' num">'+(up?'+':'')+fmtQty(f.delta,dec)+' '+esc(f.unit)+'</td>'
+      +'<td class="r num muted">'+fmtQty(f.before,dec)+'</td>'
+      +'<td class="r num">'+fmtQty(f.after,dec)+'</td>'
+      +'<td class="muted">'+esc(f.remark||'—')+'</td>'
+    +'</tr>';
+  }).join('');
+  document.getElementById('flowEmpty').style.display = flows.length ? 'none' : 'block';
+  const today = ymd(new Date());
+  const todayCnt = state.flows.filter(f=>f.biz === today).length;
+  const lastTs = flows.length ? flows[0].ts : null;
+  document.getElementById('flowSub').textContent =
+    '共 '+flows.length+' 条记录 · 今日 '+todayCnt+' 条'+(lastTs ? ' · 最近一次操作 '+dtFull(lastTs) : '');
+}
+
+/* ===== 待采购 ===== */
+function renderPurchases(){
+  const dec = state.precision;
+  const rank = b => b.stocked ? 2 : (b.done ? 1 : 0);
+  const list = state.purchases.slice().sort((a,b)=>{
+    if(rank(a) !== rank(b)) return rank(a) - rank(b);                        // 待采购 → 已采购待到货 → 已入库
+    if(rank(a) === 0) return String(a.plan).localeCompare(String(b.plan));   // 待采购按期望到货日期升序
+    return String(b.stockedDate || b.doneDate).localeCompare(String(a.stockedDate || a.doneDate));
+  });
+  const pend   = state.purchases.filter(x=>!x.done);
+  const wait   = state.purchases.filter(x=>x.done && !x.stocked);
+  const stored = state.purchases.filter(x=>x.stocked);
+  const overdue = pend.filter(x=>daysUntil(x.plan) < 0).length;
+  const todayN  = pend.filter(x=>daysUntil(x.plan) === 0).length;
+  document.getElementById('buySub').textContent =
+    '待采购 '+pend.length+' 项 · 已采购待到货 '+wait.length+' 项 · 已入库 '+stored.length+' 项'
+    +' · 已逾期 '+overdue+' 项 · 今日到期 '+todayN+' 项';
+  document.getElementById('buyBody').innerHTML = list.map(b=>{
+    const d = daysUntil(b.plan);
+    let tag, planStyle = '';
+    if(b.stocked){
+      tag = '<span class="tag ok"><i class="dot"></i>已入库</span>';
+    }else if(b.done){
+      tag = '<span class="tag plan"><i class="dot"></i>已采购·待到货</span>';
+    }else if(d < 0){
+      tag = '<span class="tag danger"><i class="dot"></i>已逾期</span>';
+      planStyle = ' style="color:var(--danger);font-weight:700"';
+    }else if(d === 0){
+      tag = '<span class="tag warn"><i class="dot"></i>今日到期</span>';
+    }else{
+      tag = '<span class="tag buy"><i class="dot"></i>待采购</span>';
+    }
+    const prod = b.code ? state.products.find(p=>p.code === b.code) : null;
+    const ops = [];
+    if(b.stocked){
+      ops.push('<button class="mini" data-buy-act="unin" data-id="'+b.id+'">撤销入库</button>');
+    }else{
+      if(prod) ops.push('<button class="mini in"   data-buy-act="in"   data-id="'+b.id+'">入库</button>');
+      if(b.done) ops.push('<button class="mini" data-buy-act="undo" data-id="'+b.id+'">撤销完成</button>');
+      else       ops.push('<button class="mini edit" data-buy-act="done" data-id="'+b.id+'">完成</button>');
+      ops.push('<button class="mini edit" data-buy-act="edit" data-id="'+b.id+'">编辑</button>');
+    }
+    ops.push('<button class="mini del" data-buy-act="del" data-id="'+b.id+'" title="删除">✕</button>');
+    return '<tr>'
+      +'<td class="c">'+tag+'</td>'
+      +'<td>'+(b.code ? '<span class="code">'+esc(b.code)+'</span> ' : '')+esc(b.name)+(b.code && !prod ? ' <span class="muted">(商品已删除)</span>' : '')+'</td>'
+      +'<td class="r"><span class="qty num">'+fmtQty(b.qty,dec)+'<span class="u">'+esc(b.unit)+'</span></span></td>'
+      +'<td><span class="time full"'+planStyle+'>'+ymdCn(b.plan)+'</span> <span class="muted">'+planHint(b.plan, b.done || b.stocked)+'</span></td>'
+      +'<td><span class="time muted">'+ymdCn(b.created)+'</span></td>'
+      +'<td>'+(b.done ? '<span class="time in">'+ymdCn(b.doneDate)+'</span>' : '<span class="time none">—</span>')+'</td>'
+      +'<td>'+(b.stocked ? '<span class="time in">'+ymdCn(b.stockedDate)+'</span>' : '<span class="time none">—</span>')+'</td>'
+      +'<td class="muted">'+esc(b.remark||'—')+'</td>'
+      +'<td class="c"><div class="ops" style="justify-content:center">'+ops.join('')+'</div></td>'
+    +'</tr>';
+  }).join('');
+  document.getElementById('buyEmpty').style.display = list.length ? 'none' : 'block';
+}
+
+let buyCtx = { mode:'new', id:null };
+
+function fillBuyProd(selected){
+  const sel = document.getElementById('byProd');
+  const opts = state.products.slice().sort((a,b)=>a.code.localeCompare(b.code))
+    .map(p=>'<option value="'+p.code+'">'+p.code+' · '+esc(p.name)+'</option>').join('');
+  sel.innerHTML = opts + '<option value="__manual__">＋ 手工填写（未建档商品）…</option>';
+  if(selected === '__manual__') sel.value = '__manual__';
+  else if(selected && state.products.some(p=>p.code === selected)) sel.value = selected;
+  toggleBuyManual();
+}
+function toggleBuyManual(){
+  const manual = document.getElementById('byProd').value === '__manual__';
+  document.getElementById('byManualRow').style.display = manual ? 'grid' : 'none';
+  if(manual) setTimeout(()=>document.getElementById('byName').focus(), 30);
+  renderBuyPreview();
+}
+/** 选中的商品：把图片与采购链接展示出来（图片可点开大图，链接可点开网址） */
+function renderBuyPreview(){
+  const box = document.getElementById('byPrev');
+  const p = state.products.find(x=>x.code === document.getElementById('byProd').value);
+  if(!p){ box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  const img = document.getElementById('byImg'), ph = document.getElementById('byImgPh');
+  if(p.image){
+    img.src = p.image; img.style.display = 'block'; ph.style.display = 'none';
+  }else{
+    img.style.display = 'none'; img.removeAttribute('src'); ph.style.display = 'grid';
+  }
+  document.getElementById('byPName').textContent =
+    p.code + ' · ' + p.name + (p.spec && p.spec !== '—' ? '  ['+p.spec+']' : '');
+  document.getElementById('byPMeta').textContent =
+    '当前库存 ' + fmtQty(p.qty, state.precision) + ' ' + p.unit
+    + (p.cat ? ' · 品类 '+p.cat : '') + (p.loc ? ' · 库位 '+p.loc : '') + (p.vendor ? ' · 供应商 '+p.vendor : '');
+  const a = document.getElementById('byPLink'), none = document.getElementById('byPNoLink');
+  if(p.link){
+    a.href = p.link; a.title = p.link;
+    a.textContent = linkHost(p.link) + ' ↗';
+    a.style.display = 'inline-block'; none.style.display = 'none';
+  }else{
+    a.removeAttribute('href');
+    a.style.display = 'none'; none.style.display = 'inline';
+  }
+}
+function openBuy(mode, id){
+  const err = document.getElementById('byErr');
+  err.textContent = '';
+  buyCtx = { mode, id: id || null };
+  const isEdit = mode === 'edit';
+  const b = isEdit ? state.purchases.find(x=>x.id === id) : null;
+  if(isEdit && !b) return;
+  document.getElementById('byTitle').textContent = isEdit ? '编辑待采购' : '新增待采购';
+  document.getElementById('bySub2').textContent = isEdit
+    ? '创建日期 '+ymdCn(b.created)+' · 修改后点保存'
+    : '创建日期自动取今天 · 期望到货日期必填，逾期会红色提醒';
+  fillBuyProd(isEdit ? (b.code || '__manual__') : null);
+  document.getElementById('byName').value = isEdit ? b.name : '';
+  document.getElementById('byUnit').value = isEdit ? b.unit : '';
+  document.getElementById('byQty').value = isEdit ? fmtQty(b.qty, DEC_MAX).replace(/,/g,'') : '';
+  document.getElementById('byPlan').value = isEdit ? b.plan : ymd(new Date());
+  document.getElementById('byRemark').value = isEdit ? (b.remark||'') : '';
+  dlgBuy.showModal();
+  tick();
+  setTimeout(()=>document.getElementById('byQty').focus(), 30);
+}
+document.getElementById('btnNewBuy').addEventListener('click', ()=>openBuy('new'));
+document.getElementById('byProd').addEventListener('change', toggleBuyManual);
+/* 待采购弹窗里点商品图片 → 看大图 */
+document.getElementById('byImg').addEventListener('click', ()=>{
+  const p = state.products.find(x=>x.code === document.getElementById('byProd').value);
+  if(p && p.image){
+    document.getElementById('bigImg').src = p.image;
+    document.getElementById('bigCap').textContent = p.code+' · '+p.name+'  ['+p.spec+']';
+    dlgImg.showModal();
+  }
+});
+document.getElementById('byCancel').addEventListener('click', ()=>dlgBuy.close());
+document.getElementById('byTodayBtn').addEventListener('click', ()=>{
+  document.getElementById('byPlan').value = ymd(new Date());
+});
+document.getElementById('byOk').addEventListener('click', ()=>{
+  const err = document.getElementById('byErr');
+  const isEdit = buyCtx.mode === 'edit';
+  const selVal = document.getElementById('byProd').value;
+  let code = '', name = '', unit = '';
+  if(selVal === '__manual__'){
+    name = document.getElementById('byName').value.trim();
+    if(!name) return err.textContent = '请填写商品名称';
+    unit = document.getElementById('byUnit').value.trim() || '个';
+  }else{
+    const p = state.products.find(x=>x.code === selVal);
+    if(!p) return err.textContent = '请选择要采购的商品';
+    code = p.code; name = p.name; unit = p.unit;
+  }
+  const q = parseQty(document.getElementById('byQty').value);
+  if(q === null || q <= 0) return err.textContent = '采购数量格式不正确（需大于 0，最多 4 位小数）';
+  const plan = document.getElementById('byPlan').value;
+  if(!plan) return err.textContent = '请选择期望到货日期';
+  const remark = document.getElementById('byRemark').value.trim();
+  if(isEdit){
+    const b = state.purchases.find(x=>x.id === buyCtx.id);
+    Object.assign(b, {code, name, unit, qty:q, plan, remark});
+  }else{
+    state.purchases.push({
+      id: 'B'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36),
+      code, name, unit, qty:q, plan,
+      created: ymd(new Date()), remark, done:false, doneDate:''
+    });
+  }
+  save(); render(); dlgBuy.close();
+});
+document.getElementById('buyBody').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-buy-act]');
+  if(!b) return;
+  const id = b.dataset.id, act = b.dataset.buyAct;
+  const item = state.purchases.find(x=>x.id === id);
+  if(!item) return;
+  if(act === 'edit') return openBuy('edit', id);
+  if(act === 'in')   return openMove(item.code, 'in', item);   // 到货了：点一下直接入库，数量按待采购数量预填
+  if(act === 'done'){
+    item.done = true; item.doneDate = ymd(new Date());          // 采购完成；「入库」按钮保留，等货到再点
+    save(); render();
+  }
+  if(act === 'undo'){
+    item.done = false; item.doneDate = '';
+    save(); render();
+  }
+  if(act === 'unin'){
+    if(!confirm('确认撤销「'+item.name+'」的入库？库存数量会回退到入库前，并删除这条入库流水。')) return;
+    const bp = state.products.find(x=>x.code === item.code);
+    const bf = item.inFlowId ? state.flows.find(x=>x.fid === item.inFlowId) : null;
+    if(bf && bp){
+      if(bp.qty - bf.delta < 0) return alert('撤销失败：该批入库已被后续出库消耗，请改用手工调整库存。');
+      bp.qty = bp.qty - bf.delta;
+      state.flows = state.flows.filter(x=>x !== bf);
+    }
+    item.stocked = false; item.stockedDate = ''; item.inFlowId = '';
+    save(); render();
+    return;
+  }
+  if(act === 'del'){
+    if(confirm('确认删除待采购「'+item.name+'」？')){
+      state.purchases = state.purchases.filter(x=>x.id !== id);
+      save(); render();
+    }
+  }
+});
+
+/* ===== 图片：读取 → 等比压缩 → dataURL ===== */
+const IMG_MAX = 420, IMG_QUALITY = 0.82;
+
+function readImage(file, cb){
+  if(!file || !/^image\//.test(file.type)) return cb(null, '请选择图片文件');
+  const fr = new FileReader();
+  fr.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const scale = Math.min(1, IMG_MAX / Math.max(w, h));
+      const cw = Math.max(1, Math.round(w*scale)), ch = Math.max(1, Math.round(h*scale));
+      const c = document.createElement('canvas');
+      c.width = cw; c.height = ch;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cw,ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      cb(c.toDataURL('image/jpeg', IMG_QUALITY), null, w+'×'+h);
+    };
+    img.onerror = () => cb(null, '图片解析失败，请换一张试试');
+    img.src = fr.result;
+  };
+  fr.onerror = () => cb(null, '图片读取失败');
+  fr.readAsDataURL(file);
+}
+
+let pendingImage = '';
+
+function setFormImage(dataUrl, meta){
+  pendingImage = dataUrl || '';
+  const prev = document.getElementById('imgPrev');
+  const ph = document.getElementById('imgPh');
+  const ov = document.getElementById('imgOverlay');
+  const info = document.getElementById('imgInfo');
+  if(pendingImage){
+    prev.src = pendingImage; prev.style.display = 'block';
+    ph.style.display = 'none'; ov.style.display = 'block';
+    const kb = Math.round(pendingImage.length*0.75/1024);
+    info.textContent = '已选择图片'+(meta ? ' · 原图 '+meta : '')+' · 压缩后约 '+kb+' KB';
+  }else{
+    prev.style.display = 'none'; prev.removeAttribute('src');
+    ph.style.display = 'block'; ov.style.display = 'none';
+    info.textContent = '未选择图片';
+  }
+}
+
+const imgBox = document.getElementById('imgBox');
+imgBox.addEventListener('click', ()=>document.getElementById('imgFile').click());
+document.getElementById('imgPick').addEventListener('click', e=>{ e.stopPropagation(); document.getElementById('imgFile').click(); });
+document.getElementById('imgFile').addEventListener('change', e=>{
+  const f = e.target.files && e.target.files[0];
+  if(f) readImage(f, (d,err,meta)=>{
+    if(err){ document.getElementById('fdErr').textContent = err; return; }
+    document.getElementById('fdErr').textContent = '';
+    setFormImage(d, meta);
+  });
+  e.target.value = '';
+});
+['dragenter','dragover'].forEach(ev=>imgBox.addEventListener(ev, e=>{ e.preventDefault(); imgBox.classList.add('over'); }));
+['dragleave','drop'].forEach(ev=>imgBox.addEventListener(ev, e=>{ e.preventDefault(); imgBox.classList.remove('over'); }));
+imgBox.addEventListener('drop', e=>{
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) readImage(f, (d,err,meta)=>{
+    if(err){ document.getElementById('fdErr').textContent = err; return; }
+    document.getElementById('fdErr').textContent = '';
+    setFormImage(d, meta);
+  });
+});
+document.getElementById('imgClear').addEventListener('click', e=>{ e.stopPropagation(); setFormImage(''); });
+document.getElementById('dlgForm').addEventListener('paste', e=>{
+  const items = e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  for(const it of items){
+    if(it.type && it.type.indexOf('image') === 0){
+      const f = it.getAsFile();
+      if(f){ readImage(f, (d,err,meta)=>{ if(!err) setFormImage(d, meta); }); e.preventDefault(); return; }
+    }
+  }
+});
+
+/* ===== 商品表单：新增 / 编辑（编码可改） ===== */
+let formCtx = { mode:'new', code:null };
+
+function fillCatSelect(selected){
+  const cats = allCategories();
+  const sel = document.getElementById('fdCat');
+  sel.innerHTML = '<option value="">未分类</option>'
+    + cats.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')
+    + '<option value="__new__">＋ 新建品类（数量无上限）…</option>';
+  sel.value = selected && cats.includes(selected) ? selected : (selected ? '__new__' : '');
+  toggleNewCat();
+}
+function toggleNewCat(){
+  const isNew = document.getElementById('fdCat').value === '__new__';
+  document.getElementById('fdCatNewRow').style.display = isNew ? 'block' : 'none';
+  if(isNew) setTimeout(()=>document.getElementById('fdCatNew').focus(), 30);
+}
+/** 价格实时试算 */
+function updateCalc(){
+  const c = parseMoney(document.getElementById('fdCost').value);
+  const s = parseMoney(document.getElementById('fdSale').value);
+  const q = parseQty(document.getElementById('fdQty').value || '0');
+  const okC = c !== null && !isNaN(c), okS = s !== null && !isNaN(s);
+  const gap = (okC && okS) ? s - c : null;
+  const rate = (okS && s > 0 && okC) ? (s - c)/s : null;
+  document.getElementById('calcGap').textContent = gap === null ? '—' : fmtMoney(gap);
+  const rateEl = document.getElementById('calcRate');
+  rateEl.textContent = rate === null ? '—' : (rate*100).toFixed(1)+'%';
+  rateEl.className = rate === null ? '' : (rate < 0 ? 'gp neg' : 'gp');
+  document.getElementById('calcCost').textContent = (okC && q !== null && q >= 0)
+    ? fmtMoney(Math.round(q * c / SCALE)) : '—';
+  document.getElementById('calcAmt').textContent = (okS && q !== null && q >= 0)
+    ? fmtMoney(Math.round(q * s / SCALE)) : '—';
+}
+
+function openForm(mode, code){
+  const err = document.getElementById('fdErr');
+  err.textContent = '';
+  formCtx = { mode, code: code || null };
+  const isEdit = mode === 'edit';
+  const p = isEdit ? state.products.find(x=>x.code === code) : null;
+  if(isEdit && !p) return;
+
+  document.getElementById('fmTitle').textContent = isEdit ? '编辑商品' : '新增商品';
+  document.getElementById('fmSub').innerHTML = isEdit
+    ? '商品编码可修改（改动会同步更新该商品的出入库流水）· 图片与全部信息均可编辑'
+    : '商品编码可直接填写 · 图片与商品信息均可填写 · 编码不可重复';
+
+  document.getElementById('fdCode').value = isEdit ? p.code : '';
+  document.getElementById('fdName').value = isEdit ? p.name : '';
+  document.getElementById('fdSpec').value = isEdit ? (p.spec === '—' ? '' : p.spec) : '';
+  fillCatSelect(isEdit ? p.cat : '');
+  document.getElementById('fdCatNew').value = '';
+  document.getElementById('fdUnit').value = isEdit ? p.unit : '';
+  document.getElementById('fdCost').value = isEdit ? toYuan(p.cost === undefined ? 0 : p.cost) : '';
+  document.getElementById('fdSale').value = isEdit ? toYuan(p.sale) : '';
+  document.getElementById('fdQty').value  = isEdit ? fmtQty(p.qty, DEC_MAX).replace(/,/g,'') : '';
+  document.getElementById('fdSafe').value = isEdit ? fmtQty(p.safe, DEC_MAX).replace(/,/g,'') : '';
+  document.getElementById('fdLoc').value  = isEdit ? (p.loc||'') : '';
+  document.getElementById('fdVendor').value = isEdit ? (p.vendor||'') : '';
+  document.getElementById('fdLink').value = isEdit ? (p.link||'') : '';
+  document.getElementById('fdNote').value = isEdit ? (p.note||'') : '';
+  document.getElementById('fdTime').value = dtLocal(Date.now());
+  setFormImage(isEdit ? (p.image||'') : '');
+  updateCalc();
+
+  dlgForm.showModal();
+  tick();
+  setTimeout(()=>document.getElementById('fdName').focus(), 30);
+}
+
+document.getElementById('fdCat').addEventListener('change', toggleNewCat);
+document.getElementById('fdCancel').addEventListener('click', ()=>dlgForm.close());
+document.getElementById('fdNowBtn').addEventListener('click', ()=>{
+  document.getElementById('fdTime').value = dtLocal(Date.now());
+});
+document.getElementById('fdManageCat').addEventListener('click', ()=>openCat());
+['fdCost','fdSale','fdQty'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateCalc);
+});
+
+document.getElementById('fdOk').addEventListener('click', ()=>{
+  const err = document.getElementById('fdErr');
+  const isEdit = formCtx.mode === 'edit';
+  const oldCode = formCtx.code;
+  const code = document.getElementById('fdCode').value.trim().toUpperCase();
+  const name = document.getElementById('fdName').value.trim();
+  if(!code) return err.textContent = '请填写商品编码';
+  if(!name) return err.textContent = '请填写商品名称';
+  if(state.products.some(p=>p.code === code && !(isEdit && p.code === oldCode)))
+    return err.textContent = '编码 '+code+' 已存在，请换一个';
+
+  /* 品类 */
+  let cat = document.getElementById('fdCat').value;
+  if(cat === '__new__'){
+    cat = document.getElementById('fdCatNew').value.trim();
+    if(!cat) return err.textContent = '请填写新品类名称';
+    addCategory(cat);
+  }
+  cat = cat || '未分类';
+  if(cat === '未分类') addCategory('未分类');
+
+  /* 价格：采购价格 + 售价（售价可留空 = 未设置） */
+  const c = parseMoney(document.getElementById('fdCost').value);
+  if(isNaN(c)) return err.textContent = '采购价格格式不正确（最多 2 位小数）';
+  const s = parseMoney(document.getElementById('fdSale').value);
+  if(isNaN(s)) return err.textContent = '售价格式不正确（最多 2 位小数）';
+  if(c !== null && c < 0) return err.textContent = '采购价格不能为负';
+  if(s !== null && s < 0) return err.textContent = '售价不能为负';
+
+  /* 采购链接：选填；未写协议时自动补 https:// */
+  let link = document.getElementById('fdLink').value.trim();
+  if(link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+  if(link && !/^https?:\/\/[^\s]+$/i.test(link)) return err.textContent = '采购链接格式不正确，请填写完整网址';
+
+  const q  = parseQty(document.getElementById('fdQty').value || '0');
+  const sf = parseQty(document.getElementById('fdSafe').value || '0');
+  if(q  === null || q  < 0) return err.textContent = '当前库存 / 期初数量格式不正确（最多 4 位小数）';
+  if(sf === null || sf < 0) return err.textContent = '安全库存格式不正确（最多 4 位小数）';
+  const ts = parseLocal(document.getElementById('fdTime').value);
+  if(ts === null) return err.textContent = '请填写有效的操作时间';
+
+  const fields = {
+    name, cat,
+    spec: document.getElementById('fdSpec').value.trim() || '—',
+    unit: document.getElementById('fdUnit').value.trim() || '个',
+    cost: c === null ? 0 : c,
+    sale: s,                                  // null = 未设置售价
+    safe: sf,
+    loc: document.getElementById('fdLoc').value.trim(),
+    vendor: document.getElementById('fdVendor').value.trim(),
+    link,
+    note: document.getElementById('fdNote').value.trim(),
+    image: pendingImage
+  };
+
+  if(isEdit){
+    const p = state.products.find(x=>x.code === oldCode);
+    const oldQty = p.qty;
+    Object.assign(p, fields);
+    p.qty = q;
+    if(code !== oldCode){                     // 编码可修改：同步历史流水
+      p.code = code;
+      state.flows.forEach(f=>{ if(f.code === oldCode) f.code = code; });
+    }
+    if(q !== oldQty){
+      state.flows.push({
+        ts, biz: ymd(new Date(ts)), kind:'adj',
+        code:p.code, name:p.name, unit:p.unit,
+        delta: q-oldQty, before: oldQty, after: q,
+        remark: '商品信息编辑 · 库存调整'
+      });
+    }
+  }else{
+    state.products.push(Object.assign({code, qty:q}, fields));
+    if(q > 0) state.flows.push({
+      ts, biz: ymd(new Date(ts)), kind:'in',
+      code, name, unit: fields.unit,
+      delta:q, before:0, after:q, remark:'期初建账'
+    });
+  }
+  save(); render(); dlgForm.close();
+});
+
+/* ===== 品类管理弹窗 ===== */
+function openCat(){
+  document.getElementById('catErr').textContent = '';
+  document.getElementById('catNewInput').value = '';
+  renderCatList();
+  dlgCat.showModal();
+  setTimeout(()=>document.getElementById('catNewInput').focus(), 30);
+}
+document.getElementById('btnCat').addEventListener('click', openCat);
+document.getElementById('catClose').addEventListener('click', ()=>dlgCat.close());
+document.getElementById('catAddBtn').addEventListener('click', addCatFromInput);
+document.getElementById('catNewInput').addEventListener('keydown', e=>{
+  if(e.key === 'Enter'){ e.preventDefault(); addCatFromInput(); }
+});
+function addCatFromInput(){
+  const inp = document.getElementById('catNewInput');
+  const err = document.getElementById('catErr');
+  const v = inp.value.trim();
+  if(!v) return err.textContent = '请输入品类名称';
+  if(state.categories.includes(v)) return err.textContent = '品类「'+v+'」已存在，可直接在商品表单里选择';
+  addCategory(v);
+  inp.value = ''; err.textContent = '';
+  save(); render(); renderCatList();
+  inp.focus();
+}
+document.getElementById('catListBox').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-cat-act]');
+  if(!b) return;
+  const name = b.dataset.cat;
+  if(b.dataset.catAct === 'rename') renameCategory(name);
+  else deleteCategory(name);
+});
+
+/* ===== 入库 / 出库 ===== */
+let mvCtx = null;
+
+function openMove(code, dir, buy){
+  const p = state.products.find(x=>x.code === code);
+  if(!p) return;
+  mvCtx = {code, dir, buyId: buy ? buy.id : null};
+  const now = Date.now();
+  document.getElementById('mvTitle').textContent = (dir === 'in' ? '入库' : '出库') + ' · ' + p.name;
+  document.getElementById('mvSub').innerHTML =
+    '编码 <b>'+p.code+'</b> · 当前库存 <b>'+fmtQty(p.qty,state.precision)+' '+p.unit+'</b>'
+    +' · 采购价 <b>'+fmtMoney(p.cost||0)+'</b> · 售价 <b>'+fmtMoney(p.sale)+'</b>'
+    +(buy ? ' · 来自待采购 <b>'+esc(buy.name)+'</b>，数量已按待采购数量预填，可按实际到货修改' : '');
+  document.getElementById('mvQty').value = buy ? fmtQty(buy.qty, DEC_MAX).replace(/,/g,'') : '';
+  document.getElementById('mvTime').value = dtLocal(now);
+  document.getElementById('mvDate').value = ymd(new Date(now));
+  document.getElementById('mvRemark').value = buy ? '采购入库 · 待采购到货' : (dir === 'in' ? '采购入库' : '生产领用');
+  document.getElementById('mvErr').textContent = '';
+  dlgMove.showModal();
+  tick();
+  setTimeout(()=>document.getElementById('mvQty').focus(), 30);
+}
+document.getElementById('mvCancel').addEventListener('click', ()=>dlgMove.close());
+document.getElementById('mvNowBtn').addEventListener('click', ()=>{
+  document.getElementById('mvTime').value = dtLocal(Date.now());
+  document.getElementById('mvDate').value = ymd(new Date());
+});
+document.getElementById('mvTime').addEventListener('change', ()=>{
+  const t = parseLocal(document.getElementById('mvTime').value);
+  if(t) document.getElementById('mvDate').value = ymd(new Date(t));
+});
+document.getElementById('mvOk').addEventListener('click', ()=>{
+  const err = document.getElementById('mvErr');
+  const p = state.products.find(x=>x.code === mvCtx.code);
+  const q = parseQty(document.getElementById('mvQty').value);
+  if(q === null) return err.textContent = '数量格式不正确（最多 4 位小数）';
+  if(q <= 0)     return err.textContent = '数量必须大于 0';
+  const ts = parseLocal(document.getElementById('mvTime').value);
+  if(ts === null) return err.textContent = '请填写有效的操作时间';
+  const delta = mvCtx.dir === 'in' ? q : -q;
+  if(p.qty + delta < 0) return err.textContent = '出库数量超出当前库存（当前 '+fmtQty(p.qty,DEC_MAX)+' '+p.unit+'）';
+  const before = p.qty;
+  p.qty = before + delta;
+  const flow = {
+    fid: 'F'+ts.toString(36)+Math.random().toString(36).slice(2,5),
+    ts, biz: document.getElementById('mvDate').value || ymd(new Date(ts)),
+    kind: mvCtx.dir,
+    code: p.code, name: p.name, unit: p.unit,
+    delta, before, after: p.qty,
+    remark: document.getElementById('mvRemark').value.trim()
+  };
+  state.flows.push(flow);
+  if(mvCtx.buyId && mvCtx.dir === 'in'){        // 由待采购「入库」发起的：标记已入库 + 记入库日期
+    const b = state.purchases.find(x=>x.id === mvCtx.buyId);
+    if(b){
+      if(!b.done){ b.done = true; b.doneDate = ymd(new Date(ts)); }
+      b.stocked = true; b.stockedDate = ymd(new Date(ts)); b.inFlowId = flow.fid;
+    }
+  }
+  save(); render(); dlgMove.close();
+});
+
+/* ===== 表格操作 / 大图 ===== */
+document.getElementById('tbody').addEventListener('click', e=>{
+  const th = e.target.closest('img[data-img]');
+  if(th){
+    const p = state.products.find(x=>x.code === th.dataset.img);
+    if(p && p.image){
+      document.getElementById('bigImg').src = p.image;
+      document.getElementById('bigCap').textContent = p.code+' · '+p.name+'  ['+p.spec+']';
+      dlgImg.showModal();
+    }
+    return;
+  }
+  const cl = e.target.closest('[data-cat-filter]');
+  if(cl){ document.getElementById('fCategory').value = cl.dataset.catFilter; render(); return; }
+  const b = e.target.closest('button[data-act]');
+  if(!b) return;
+  const act = b.dataset.act, code = b.dataset.code;
+  if(act === 'in' || act === 'out') return openMove(code, act);
+  if(act === 'edit') return openForm('edit', code);
+  if(act === 'del'){
+    const p = state.products.find(x=>x.code === code);
+    if(confirm('确认删除商品 '+code+' '+p.name+'？')) {
+      state.products = state.products.filter(x=>x.code !== code);
+      save(); render();
+    }
+  }
+});
+document.getElementById('dlgImg').addEventListener('click', ()=>dlgImg.close());
+/* 流水里的商品缩略图 → 点开看大图 */
+document.getElementById('flowBody').addEventListener('click', e=>{
+  const th = e.target.closest('img[data-fimg]');
+  if(!th) return;
+  const p = state.products.find(x=>x.code === th.dataset.fimg);
+  if(p && p.image){
+    document.getElementById('bigImg').src = p.image;
+    document.getElementById('bigCap').textContent = p.code+' · '+p.name+'  ['+p.spec+']';
+    dlgImg.showModal();
+  }
+});
+
+/* ===== 工具条 / 按钮 ===== */
+document.getElementById('btnNew').addEventListener('click', ()=>openForm('new'));
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  if(confirm('恢复示例数据？当前商品、品类、图片、待采购与流水将被覆盖。')){ seed(); save(); render(); }
+});
+document.getElementById('btnClearFlow').addEventListener('click', ()=>{
+  if(confirm('确认清空全部流水记录？')){ state.flows = []; save(); render(); }
+});
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const dec = state.precision;
+  const rows = [['库存明细导出','业务日期 '+ymdCn(state.bizDate),'导出时间 '+dtFull(Date.now()),'品类数（无上限） '+allCategories().length]];
+  rows.push(['商品编码','商品名称','规格','品类','采购链接','单位','当前库存','安全库存','最近入库时间','最近出库时间',
+             '采购价格(元)','售价(元)','库存金额-采购价(元)','货值-售价(元)','单位毛利(元)','毛利率','状态','库位','供应商','备注','图片']);
+  filtered().forEach(p=>{
+    const li = lastMove(p.code,'in'), lo = lastMove(p.code,'out');
+    const r = grossRate(p);
+    rows.push([
+      p.code, p.name, p.spec, p.cat, p.link||'', p.unit,
+      fmtQty(p.qty,dec).replace(/,/g,''), fmtQty(p.safe,dec).replace(/,/g,''),
+      li ? dtFull(li) : '', lo ? dtFull(lo) : '',
+      (p.cost/100).toFixed(2), p.sale ? (p.sale/100).toFixed(2) : '',
+      (costCents(p)/100).toFixed(2), p.sale ? (saleCents(p)/100).toFixed(2) : '',
+      p.sale ? ((p.sale-(p.cost||0))/100).toFixed(2) : '',
+      r === null ? '' : (r*100).toFixed(1)+'%',
+      STATUS_TXT[statusOf(p)], p.loc||'', p.vendor||'', p.note||'', p.image ? '已上传' : '无'
+    ]);
+  });
+  rows.push([]);
+  rows.push(['品类的数量（无上限）',''+allCategories().length+' 个品类']);
+  rows.push(['品类','商品数']);
+  allCategories().forEach(c=>rows.push([c, countByCat(c)]));
+  rows.push([]);
+  rows.push(['待采购清单']);
+  rows.push(['状态','商品编码','商品名称','采购数量','单位','期望到货日期','创建日期','采购完成日期','入库日期','备注']);
+  state.purchases.slice().sort((a,b)=>String(a.plan).localeCompare(String(b.plan))).forEach(b=>rows.push([
+    b.stocked ? '已入库'
+      : (b.done ? '已采购待到货'
+      : (daysUntil(b.plan) < 0 ? '已逾期' : (daysUntil(b.plan) === 0 ? '今日到期' : '待采购'))),
+    b.code||'', b.name, fmtQty(b.qty,dec).replace(/,/g,''), b.unit,
+    ymdCn(b.plan), ymdCn(b.created), b.done ? ymdCn(b.doneDate) : '',
+    b.stocked ? ymdCn(b.stockedDate) : '', b.remark||''
+  ]));
+  rows.push([]);
+  rows.push(['出入库流水']);
+  rows.push(['类型','操作时间','业务日期','编码','名称','数量变动','变动前','变动后','备注']);
+  state.flows.slice().sort((a,b)=>b.ts-a.ts).forEach(f=>rows.push([
+    KIND_TXT[f.kind||(f.delta>0?'in':'out')], dtFull(f.ts), ymdCn(f.biz), f.code, f.name,
+    fmtQty(f.delta,dec).replace(/,/g,''), fmtQty(f.before,dec).replace(/,/g,''),
+    fmtQty(f.after,dec).replace(/,/g,''), f.remark||''
+  ]));
+  const csv = '﻿' + rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = '库存工作台_'+ymd(new Date())+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+document.getElementById('kw').addEventListener('input', render);
+document.getElementById('fCategory').addEventListener('change', render);
+document.getElementById('fStatus').addEventListener('change', render);
+document.getElementById('fTime').addEventListener('change', render);
+document.getElementById('fImg').addEventListener('change', render);
+document.getElementById('fPrice').addEventListener('change', render);
+let currentSort = '';
+document.getElementById('qtySort').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-sort]');
+  if(!b) return;
+  currentSort = b.dataset.sort;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle('on', x === b));
+  render();
+});
+document.getElementById('precision').addEventListener('change', e=>{
+  state.precision = Number(e.target.value);
+  save(); render();
+});
+document.getElementById('bizDate').addEventListener('change', e=>{
+  state.bizDate = e.target.value || ymd(new Date());
+  save(); render();
+});
+document.getElementById('btnToday').addEventListener('click', ()=>{
+  state.bizDate = ymd(new Date());
+  document.getElementById('bizDate').value = state.bizDate;
+  save(); render();
+});
+
+/* ===== 数据同步：导出备份 / 导入恢复 / 复制分享链接 ===== */
+function b64e(s){
+  const t = unescape(encodeURIComponent(s));
+  let out = '';
+  for(let i=0;i<t.length;i+=8192) out += String.fromCharCode.apply(null, t.slice(i, i+8192));
+  return btoa(out);
+}
+function b64d(s){
+  try{ return decodeURIComponent(escape(atob(s))); }catch(e){ return ''; }
+}
+function backupPayload(){
+  return {app:'inventory-workbench', version:4, exportedAt: dtFull(Date.now()), state: state};
+}
+/** 把一份规范化后的数据整体接管为当前数据（顶栏、精度、渲染一并刷新） */
+function applyState(d){
+  state = Object.assign(state, d);
+  syncCategories();
+  document.getElementById('bizDate').value = state.bizDate || ymd(new Date());
+  document.getElementById('precision').value = String(state.precision);
+  save(); render();
+}
+document.getElementById('btnBak').addEventListener('click', ()=>{
+  const d = new Date();
+  const name = '库存工作台-备份-'+ymd(d).replace(/-/g,'')+'-'+p2(d.getHours())+p2(d.getMinutes())+p2(d.getSeconds())+'.json';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(backupPayload())], {type:'application/json'}));
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+});
+document.getElementById('btnImp').addEventListener('click', ()=>document.getElementById('impFile').click());
+document.getElementById('impFile').addEventListener('change', e=>{
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!f) return;
+  const r = new FileReader();
+  r.onerror = ()=>alert('读取备份文件失败，请重试。');
+  r.onload = ()=>{
+    let d = null;
+    try{ const o = JSON.parse(String(r.result)); d = normalizeState(o && o.state ? o.state : o); }catch(err){ d = null; }
+    if(!d) return alert('导入失败：这个文件不是本工作台的备份数据，或内容已损坏。');
+    if(!confirm('导入会覆盖当前全部商品、图片、待采购与流水，确认继续？')) return;
+    applyState(d);
+    alert('导入完成：商品 '+state.products.length+' 项 · 待采购 '+state.purchases.length+' 项 · 流水 '+state.flows.length+' 条。');
+  };
+  r.readAsText(f, 'utf-8');
+});
+document.getElementById('btnShare').addEventListener('click', ()=>{
+  const url = location.href.split('#')[0] + '#data=' + b64e(JSON.stringify(backupPayload()));
+  const tip = '分享链接已复制（约 '+Math.round(url.length/1024)+' KB）。\n\n'
+    + '在其它浏览器、其它电脑，把这条网址粘贴到地址栏打开，就能直接继续使用同一份数据。';
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(()=>alert(tip), ()=>prompt('请手动复制这条网址：', url));
+  }else{
+    prompt('请手动复制这条网址：', url);
+  }
+});
+
+/* ===== 启动 ===== */
+const dlgForm = document.getElementById('dlgForm');
+const dlgMove = document.getElementById('dlgMove');
+const dlgCat  = document.getElementById('dlgCat');
+const dlgImg  = document.getElementById('dlgImg');
+const dlgBuy  = document.getElementById('dlgBuy');
+
+load();
+syncCategories();
+document.getElementById('bizDate').value = state.bizDate || ymd(new Date());
+document.getElementById('precision').value = String(state.precision);
+tick(); setInterval(tick, 1000);
+render();
+
+/* 打开带数据的分享链接：直接恢复同一份数据，换浏览器/换电脑继续用 */
+(function(){
+  const h = location.hash || '';
+  if(h.indexOf('#data=') !== 0) return;
+  let o = null, d = null;
+  try{ o = JSON.parse(b64d(h.slice(6))); d = normalizeState(o && o.state ? o.state : o); }catch(e){ d = null; }
+  if(!d) return alert('这条网址里的数据无法识别，可能是复制时被截断了。');
+  if(!confirm('这条网址带着 '+(o && o.exportedAt ? o.exportedAt+' ' : '')+'导出的库存数据，是否载入并覆盖当前数据？')) return;
+  applyState(d);
+  try{ history.replaceState(null, '', location.href.split('#')[0]); }catch(e){}
+  alert('已载入分享数据：商品 '+state.products.length+' 项 · 待采购 '+state.purchases.length+' 项 · 流水 '+state.flows.length+' 条。');
+})();
+</script>
+</body>
+</html>
